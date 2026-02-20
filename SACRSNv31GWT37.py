@@ -1,0 +1,1857 @@
+# ============================================================
+# SACRSN v41.0 (UNIFIED): The Definitive Coherent System
+# ============================================================
+#
+# Full Lineage:
+#   v35.7 (GWT Audited) -> v36 (Dialectic: Thesis/Antithesis/Synthesis) ->
+#   v37 (Ephemeral/Decay) -> v40.1 (Hopfield Attractor Dynamics) ->
+#   v40.4 (MoE + Differentiable Stack) -> v40.8 (Sensory Parity) ->
+#   v40.9 (Narrative Belief System) -> v40.11 (Full Logging) ->
+#   v40.12 (Introspective) -> v40.13 (Reframing / Belief Trajectory) ->
+#   v40.14 (Dominance Detection / Active Reframing) ->
+#   v40.16 (Paradigm Shift Detection) -> v40.17 (Transparent Init) ->
+#   v40.18 (Meta-Beliefs / Perspective Index) ->
+#   v40.19 (Expectation Bias / Reframing Cooldown) ->
+#   v40.20 (Situated: Context-Dependent Expectation) ->
+#   v40.21 (Verified Complete) -> v40.22 (Reality Reconciliation) ->
+#   v40.23 (Consensus / Confidence Inertia Damping) ->
+#   v40.24 (Democratic / Minority Protection) ->
+#   v40.25 (Scientific / Breakthrough Boost) ->
+#   v40.26 (Resilient / Consistency Anchoring) ->
+#   v40.27 (Evolutionary / Streak Entropy / Ecosystem Pruning) ->
+#   v40.28 (Immortal / Pruning Dampening / Narrative Capping) ->
+#   v41.0  (Unified: Full restoration + coherence audit)
+#
+# ============================================================
+# THEORETICAL FRAMEWORK
+# ============================================================
+#
+# [MATHEMATICAL]
+#   - State space is fully COMPLEX-VALUED: z = r·e^(iθ)
+#     Magnitude (r) encodes activation intensity.
+#     Phase (θ) encodes relational orientation between concepts.
+#   - ModReLU preserves phase, acts on magnitude (Arjovsky et al., 2016).
+#   - Hopfield/Attractor dynamics via iterative Boltzmann refinement:
+#       z_{t+1} = softmax(β · z_t W^T) · W
+#     providing energy minimisation toward valid codebook attractors.
+#   - Adaptive Computation Time (ACT): halting probability gates the
+#     number of processing steps, penalising unnecessary computation.
+#   - VQ-VAE commitment loss anchors continuous latents to discrete
+#     symbolic codebook entries via straight-through estimator.
+#
+# [ENGINEERING]
+#   - GRU-safe context threading (no in-place gradient errors).
+#   - Gradient clipping, LR warmup, exponential decay scheduler.
+#   - Synaptic decay + edge usage pruning stabilises the graph.
+#   - Ecosystem Pruning (bottom-2% fitness cull every 2000 epochs).
+#   - Narrative Memory Capping (narrative lists ≤ 10 entries).
+#   - Pruning Dampening (streak entropy prevents monoculture collapse).
+#   - Four competing specialist modules with GWT broadcast competition:
+#       1. ComplexAttentionBlock  (perceptual / syntactic processing)
+#       2. DifferentiableStack    (hierarchical / recursive memory)
+#       3. GraphVectorQuantizer   (semantic / symbolic grounding)
+#       4. PersistentSensoryInterface (embodied / environmental input)
+#
+# [NEUROLINGUISTIC]
+#   - Belief System: each symbol carries confidence, support, reliability,
+#     streak score, contradiction count, and lexical grounding.
+#   - Narrative Engine: NLP-layer translating belief dynamics into
+#     human-readable cognitive trajectories (Reinforcing / Decaying / etc.)
+#   - Paradigm Shift Detection: identifies when one belief supersedes another.
+#   - Epistemic Humility: forced reframing under high error + low trust.
+#   - Situated Reliability: beliefs calibrated per-perspective, not globally.
+#   - Reality Reconciliation: prevents epistemic bubbles by periodically
+#     merging perspective-specific reliability toward a global norm.
+#   - Democratic Consensus: minority-protection term guards innovative
+#     beliefs against suppression by high-frequency majority patterns.
+#   - SubmodalityShifter: NLP-grounded modality shifting (intensity + phase)
+#     triggered by high transition flux (analogous to cognitive reappraisal).
+# ============================================================
+
+import os
+import time
+import random
+import re
+import numpy as np
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import matplotlib.pyplot as plt
+import networkx as nx
+from collections import defaultdict
+
+# ==========================================
+# 0. Determinism & Global Constants
+# ==========================================
+SEED = 42
+random.seed(SEED)
+np.random.seed(SEED)
+torch.manual_seed(SEED)
+if torch.cuda.is_available():
+    torch.cuda.manual_seed_all(SEED)
+torch.backends.cudnn.deterministic = True
+torch.backends.cudnn.benchmark = False
+
+DEVICE = "cuda" if torch.cuda.is_available() else "cpu"
+print(f"Running on: {DEVICE}")
+
+EPS = 1e-8
+MAX_NORM = 1.0
+
+# ==========================================
+# 1. Configuration
+# ==========================================
+# Hyperparameters are grouped by their functional domain:
+#   ARCHITECTURE: seq_len, embedding_dim, n_modules, stack_size, n_symbols
+#   ACT PHYSICS:  max_steps, halt_threshold, step_penalty
+#   GWT DYNAMICS: temperature, soft_attention_weight, regularizer_weight
+#   HOPFIELD:     refinement_steps, inverse_temperature (β)
+#   SYNAPTICS:    synaptic_decay, pruning_threshold, momentum
+#   BELIEF NLP:   insight_* thresholds, plasticity_*, trust_momentum
+#   LOSS WEIGHTS: diversity, consistency, prediction, uncertainty, entropy
+CONFIG = {
+    "seq_len": 128,
+    "embedding_dim": 512,
+    "n_modules": 4,           
+    "temperature": 1.0,  
+    "soft_attention_weight": 0.3,     
+    "regularizer_weight": 0.1,     
+    "refinement_steps": 3,       
+    "inverse_temperature": 50.0,     
+    "synaptic_decay": 0.001,   
+    "pruning_threshold": 0.01, 
+    "momentum": 0.99,     
+    "entropy_weight": 0.05,    
+    "transition_diff_weight": 0.2,     
+    "trust_momentum": 0.95,     
+    
+    # Insight Thresholds 
+    "insight_error_threshold": 0.9, 
+    "insight_flux_threshold": 1.5,  
+    "restructure_strength": 0.15,
+    "redefinition_rate": 0.3,      
+    "extinction_threshold": 0.6,   
+    "extinction_strength": 0.05,   
+    "insight_refractory": 100, 
+    
+    "plasticity_base": 0.5,    
+    "plasticity_scale": 2.0,   
+    "max_steps": 16, 
+    "halt_threshold": 0.995,   
+    "step_penalty": 0.0001,  
+    "use_stack": True,
+    "stack_size": 32,
+    "n_perspective_embs": 2,
+    "n_audio_embs": 8,
+    "n_chem_embs": 16,        
+    "sparse_reg_weight": 0.001,
+    "sensory_inertia": 0.9,       
+    "commitment_cost": 0.01,
+    "prior_bias_scale": 0.8,
+    "consistency_loss_weight": 0.005,
+    "diversity_loss_weight": 0.5,
+    "prediction_error_weight": 0.1,
+    "uncertainty_loss_weight": 0.01,
+    "sensory_prediction_weight": 0.05, 
+    "epochs": 3000,
+    "learning_rate": 3e-4, 
+    "grad_clip": 1.0,      
+    "eps": 1e-6,
+}
+
+def stabilize_complex(z, min_mag=0.05, max_mag=5.0):
+    mag = torch.abs(z)
+    phase = z / (mag + EPS)
+    mag = mag.clamp(min=min_mag, max=max_mag)
+    return mag * phase
+
+# ==========================================
+# 2. Data & BPE Tokenizer
+# ==========================================
+# [ENGINEERING + NEUROLINGUISTIC]
+# Byte-Pair Encoding (BPE) is used as the tokenization strategy.
+# BPE learns subword units by iteratively merging the most frequent
+# adjacent byte pairs — producing a vocabulary that naturally captures
+# morphological structure (roots, suffixes, compounds).
+# This grounds the system's symbolic layer in real lexical patterns,
+# bridging the engineering tokeniser to the neurolinguistic belief system.
+TEXT_DATA = """
+Artificial neural networks (ANNs) are computing systems inspired by the biological neural networks that constitute animal brains.
+An ANN is based on a collection of connected units or nodes called artificial neurons, which loosely model the neurons in a biological brain.
+Each connection, like the synapses in a biological brain, can transmit a signal to other neurons. 
+An artificial neuron receives a signal then processes it and can signal neurons connected to it. 
+The "signal" at a connection is a real number, and the output of each neuron is computed by some non-linear function of the sum of its inputs.
+The connections are called edges. Neurons and edges typically have a weight that adjusts as learning proceeds. 
+The weight increases or decreases the strength of the signal at a connection. 
+Neurons may have a threshold such that a signal is sent only if the aggregate signal crosses that threshold. 
+Typically, neurons are aggregated into layers. Different layers may perform different transformations on their inputs. 
+Signals travel from the first layer (the input layer), to the last layer (the output layer), possibly after traversing the layers multiple times.
+Recurrent neural networks (RNN) are a class of artificial neural networks where connections between nodes can create a cycle, allowing output from some nodes to affect subsequent input to the same nodes.
+This allows it to exhibit temporal dynamic behavior. Derived from feedforward neural networks, RNNs can use their internal state (memory) to process variable length sequences of inputs.
+"""
+
+class BPETokenizer:
+    def __init__(self):
+        self.merges = {} 
+        self.vocab = {}  
+        self.vocab_size = 0
+
+    def get_stats(self, ids):
+        counts = {}
+        for pair in zip(ids, ids[1:]):
+            counts[pair] = counts.get(pair, 0) + 1
+        return counts
+
+    def merge(self, ids, pair, idx):
+        newids = []
+        i = 0
+        while i < len(ids):
+            if i < len(ids) - 1 and ids[i] == pair[0] and ids[i+1] == pair[1]:
+                newids.append(idx)
+                i += 2
+            else:
+                newids.append(ids[i])
+                i += 1
+        return newids
+
+    def train(self, text, vocab_size=None):
+        ids = list(text.encode("utf-8"))
+        if vocab_size is None:
+            approx_words = len(set(re.findall(r"[\w']+|[^\s\w]", text)))
+            target_merges = approx_words + 500 
+        else:
+            target_merges = vocab_size - 256
+
+        print(f"BPE: Scanning...")
+        for i in range(target_merges):
+            stats = self.get_stats(ids)
+            if not stats: break 
+            pair = max(stats, key=stats.get)
+            if stats[pair] < 2:
+                break
+            idx = 256 + i
+            ids = self.merge(ids, pair, idx)
+            self.merges[pair] = idx
+            
+        self.vocab_size = 256 + len(self.merges)
+        print(f"BPE Training Complete. Final Vocab Size: {self.vocab_size}")
+
+    def encode(self, text):
+        ids = list(text.encode("utf-8"))
+        while len(ids) >= 2:
+            stats = self.get_stats(ids)
+            pair = min(stats, key=lambda p: self.merges.get(p, float("inf")))
+            if pair not in self.merges: break 
+            idx = self.merges[pair]
+            ids = self.merge(ids, pair, idx)
+        return torch.tensor(ids, dtype=torch.long).to(DEVICE)
+
+    def decode(self, ids):
+        vocab = {idx: bytes([idx]) for idx in range(256)}
+        for (p0, p1), idx in self.merges.items():
+            vocab[idx] = vocab[p0] + vocab[p1]
+        
+        if isinstance(ids, torch.Tensor): ids = ids.tolist()
+        if isinstance(ids, int): ids = [ids]
+        res = b"".join(vocab.get(idx, b"") for idx in ids)
+        return res.decode("utf-8", errors="replace")
+
+# Initialize BPE
+tokenizer = BPETokenizer()
+tokenizer.train(TEXT_DATA)
+data_tensor = tokenizer.encode(TEXT_DATA)
+vocab_size = tokenizer.vocab_size
+
+print(f"First 10 token IDs: {data_tensor[:10].tolist()}")
+print(f"First 10 decoded: '{tokenizer.decode(data_tensor[:10])}'")
+CONFIG["n_symbols"] = int(vocab_size * 1.2)
+print(f"--> Vocab Size: {vocab_size}")
+print(f"--> System n_symbols: {CONFIG['n_symbols']} (Includes {CONFIG['n_symbols'] - vocab_size} latent slots)")
+
+# ==========================================
+# 2.5 Belief & Narrative System
+# ==========================================
+# ==========================================
+# 2.5 Belief & Narrative System
+# ==========================================
+# [NEUROLINGUISTIC CORE]
+# The Belief System is the neurolinguistic heart of SACRSN.
+# Each discrete symbol in the VQ codebook is associated with a Belief
+# object that tracks its epistemic state over time.
+#
+# Theoretical grounding:
+#   - Confidence: Bayesian-inspired credence, updated via exponential smoothing.
+#   - Support: Running mean of reinforcement signals (analogous to synaptic weight).
+#   - Reliability: Empirical hit rate under high-confidence predictions,
+#     stratified by perspective (situated cognition theory).
+#   - Proven Streak: Entropy-damped consecutive success count. Prevents
+#     false certainty — streak degrades even without failures.
+#   - Contradictions: Counts and softens confidence under epistemic conflict.
+#   - Reframing: Cognitive reappraisal mechanism — forcibly shifts the
+#     belief's support polarity and confidence downward. Refractory period
+#     prevents rapid oscillation (analogous to post-inhibitory rebound).
+#   - Lexical Grounding: Maps each symbol to its most co-occurring word,
+#     bridging the mathematical symbol to a linguistic anchor.
+#
+# NarrativeEngine: Translates raw belief dynamics into human-readable
+# cognitive trajectories using NLP-grounded language:
+#   "Reinforcing", "Decaying", "Drifting Up/Down", "Stable"
+# This makes the system's internal state auditable and interpretable.
+
+class Belief:
+    def __init__(self, symbol_id):
+        self.symbol_id = symbol_id
+        self.confidence = 0.5
+        self.support = 0.0
+        self.contradictions = 0
+        self.last_update_epoch = 0
+        self.narrative = []
+        self.lexical_support = defaultdict(int)
+        self.history = [] 
+        
+        # Meta-Beliefs
+        self.prediction_hits = 0
+        self.prediction_misses = 0
+        self.last_perspective_id = -1
+        
+        # Perspective Stats
+        self.perspective_hits = defaultdict(int)
+        self.perspective_total = defaultdict(int)
+        
+        # Cooldown
+        self.last_reframe_epoch = -100
+        
+        # Consistency Gating
+        self.proven_streak = 0
+
+    def update(self, score, confidence, epoch, note=None, p_idx=-1):
+        if isinstance(score, torch.Tensor): delta = float(score.detach().cpu())
+        else: delta = float(score)
+        if isinstance(confidence, torch.Tensor): conf_val = float(confidence.detach().cpu())
+        else: conf_val = float(confidence)
+
+        self.support = 0.9 * self.support + 0.1 * delta
+        self.confidence = float(np.clip(0.8 * self.confidence + 0.2 * conf_val, 0.01, 0.99))
+        self.last_update_epoch = epoch
+        
+        # Streak Entropy (Active)
+        self.proven_streak *= 0.999
+
+        if p_idx != -1:
+            self.last_perspective_id = int(p_idx)
+            
+        if note: 
+            self.narrative.append(note)
+            # [PATCH 2] Narrative Memory Capping
+            if len(self.narrative) > 10:
+                self.narrative.pop(0)
+        
+        self.history.append((epoch, self.confidence, self.support))
+        if len(self.history) > 20: 
+            self.history.pop(0)
+
+    def calibrate(self, error, p_idx=-1):
+        if self.confidence > 0.7:
+            # Global
+            if error < 0.2: 
+                self.prediction_hits += 1
+                if self.get_reliability(-1) > 0.8:
+                    self.proven_streak += 1
+            elif error > 0.5: 
+                self.prediction_misses += 1
+                self.proven_streak = 0
+            
+            # Situated
+            if p_idx != -1:
+                self.perspective_total[p_idx] += 1
+                if error < 0.2:
+                    self.perspective_hits[p_idx] += 1
+
+    def get_reliability(self, p_idx=-1):
+        if p_idx != -1 and self.perspective_total[p_idx] > 2:
+            return (self.perspective_hits[p_idx] + 1) / (self.perspective_total[p_idx] + 2)
+        
+        total = self.prediction_hits + self.prediction_misses + EPS
+        return self.prediction_hits / total
+
+    def decay(self, rate=0.999):
+        self.confidence *= rate
+        # Streak Entropy (Passive)
+        self.proven_streak *= 0.999
+
+    def contradict(self, severity=1.0):
+        self.contradictions += 1
+        self.confidence *= (0.9 + 0.1 * (1.0 - severity))
+
+    def reframe(self, note, epoch):
+        if epoch - self.last_reframe_epoch < 100:
+            return 
+        self.confidence *= 0.9
+        self.support *= -0.5
+        
+        self.narrative.append(f"Reframed: {note}")
+        # [PATCH 2] Narrative Memory Capping
+        if len(self.narrative) > 10:
+            self.narrative.pop(0)
+            
+        self.last_reframe_epoch = epoch
+
+    def summary(self):
+        if not self.narrative: return "No history."
+        return self.narrative[-1]
+
+    def delta(self):
+        if len(self.history) < 2:
+            return None
+        (e1, c1, s1) = self.history[-2]
+        (e2, c2, s2) = self.history[-1]
+        return {
+            "d_conf": round(c2 - c1, 4),
+            "d_supp": round(s2 - s1, 4),
+            "epochs": e2 - e1
+        }
+
+    def replaced_by(self, other):
+        return self.confidence > other.confidence and self.support > other.support
+
+    def snapshot(self):
+        top_word = "None"
+        if self.lexical_support:
+            top_word = max(self.lexical_support, key=self.lexical_support.get)
+            
+        reliability = self.get_reliability(self.last_perspective_id)
+            
+        return {
+            "symbol": self.symbol_id,
+            "confidence": round(self.confidence, 3),
+            "support": round(self.support, 3),
+            "reliability": round(reliability, 2), 
+            "streak": round(self.proven_streak, 1),
+            "contradictions": self.contradictions,
+            "grounding": top_word,
+            "last_note": self.summary()
+        }
+
+class NarrativeEngine:
+    def __init__(self, vq_module, tokenizer=None, symbol_map=None):
+        self.vq = vq_module
+        self.tokenizer = tokenizer
+        self.symbol_map = symbol_map 
+
+    def get_name(self, sym_id):
+        if self.symbol_map and sym_id in self.symbol_map:
+            words = self.symbol_map[sym_id]
+            if words: return f"'{max(set(words), key=words.count)}' (S_{sym_id})"
+        return f"Symbol_{sym_id}"
+
+    def explain_transition(self, prev_sym, curr_sym):
+        belief_curr = self.vq.beliefs[curr_sym]
+        edge_strength = float(torch.sigmoid(self.vq.adjacency[prev_sym, curr_sym]).detach().cpu())
+        return (f"Transition: {self.get_name(prev_sym)} -> {self.get_name(curr_sym)} "
+                f"[Edge: {edge_strength:.2f} | Conf: {belief_curr.confidence:.2f}]")
+
+    def explain_belief_change(self, belief):
+        d = belief.delta()
+        if not d:
+            return "Stable (New)"
+        
+        c_change = d['d_conf']
+        trend = "Stable"
+        if c_change > 0.05: trend = "Reinforcing"
+        elif c_change < -0.05: trend = "Decaying"
+        elif c_change > 0.01: trend = "Drifting Up"
+        elif c_change < -0.01: trend = "Drifting Down"
+        
+        return f"{trend} (ΔC: {c_change:+.3f}, ΔS: {d['d_supp']:+.3f})"
+
+    def explain_replacement(self, old_sym_id, new_sym_id):
+        old_b = self.vq.beliefs[old_sym_id]
+        new_b = self.vq.beliefs[new_sym_id]
+        if old_b.replaced_by(new_b):
+            return f"⚠️  Belief on {self.get_name(old_sym_id)} was superseded by {self.get_name(new_sym_id)}"
+        return None
+
+# ==========================================
+# 3. Complex Primitives
+# ==========================================
+# [MATHEMATICAL CORE]
+# All computations operate in the complex number field C^d.
+# This is not decorative — it encodes a deliberate inductive bias:
+#
+#   Magnitude |z| = sqrt(re² + im²)  →  activation strength / salience
+#   Phase  φ = atan2(im, re)          →  relational orientation / binding
+#
+# Phase relationships enable 'binding by synchrony': two representations
+# that point in the same direction (small phase difference) are bound
+# as co-active concepts. This is a continuous approximation to the
+# temporal binding hypothesis in neuroscience.
+#
+# Key components:
+#   ComplexLayerNorm  : Normalises magnitude, preserves phase.
+#   ModReLU           : Rectifies magnitude, preserves phase (Arjovsky 2016).
+#   ComplexLinear     : Unitary-initialised weight matrix respecting C-linearity.
+#   ComplexAttention  : Self-attention in C^d via real projection of scores.
+#   SigmoidGatingMask : Learnable sparse filter (analogous to cortical columns).
+#   InsightOperator   : Bottleneck compression/expansion — the 'aha' moment.
+#                       Compresses state to a lower-dim latent, then expands,
+#                       forcing the system to find a more compact explanation.
+#   SubmodalityShifter: Modulates intensity and phase under cognitive flux.
+#                       Neurolinguistically: shifts the 'sensory submodality'
+#                       of a representation (brightness, pitch, kinesthesia).
+class ComplexLayerNorm(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.scale = nn.Parameter(torch.ones(dim))
+        self.shift = nn.Parameter(torch.zeros(dim))
+    def forward(self, z):
+        mag = torch.abs(z) + EPS
+        mean = mag.mean(dim=-1, keepdim=True)
+        var = mag.var(dim=-1, keepdim=True)
+        norm_mag = (mag - mean) / torch.sqrt(var + EPS)
+        norm_mag = norm_mag * self.scale + self.shift
+        phase = torch.angle(z + EPS)
+        return torch.complex(norm_mag * torch.cos(phase), norm_mag * torch.sin(phase))
+
+class ModReLU(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.bias = nn.Parameter(torch.zeros(dim))
+    def forward(self, z):
+        norm = torch.abs(z) + EPS
+        scale = F.relu(norm + self.bias) / norm
+        return z * scale
+
+class ComplexLinear(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.fc_real = nn.Linear(dim, dim, bias=False)
+        self.fc_imag = nn.Linear(dim, dim, bias=False)
+        nn.init.orthogonal_(self.fc_real.weight)
+        nn.init.orthogonal_(self.fc_imag.weight)
+    def forward(self, z):
+        return torch.complex(
+            self.fc_real(z.real) - self.fc_imag(z.imag),
+            self.fc_real(z.imag) + self.fc_imag(z.real)
+        )
+
+class ComplexAttention(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.q_proj = ComplexLinear(dim)
+        self.k_proj = ComplexLinear(dim)
+        self.v_proj = ComplexLinear(dim)
+        self.scale = dim ** -0.5
+    
+    def forward(self, z):
+        q = self.q_proj(z)
+        k = self.k_proj(z)
+        v = self.v_proj(z)
+        q_flat = torch.cat([q.real, q.imag], dim=-1)
+        k_flat = torch.cat([k.real, k.imag], dim=-1)
+        attn_scores = torch.matmul(q_flat, k_flat.transpose(-2, -1)) * self.scale
+        attn_weights = F.softmax(attn_scores, dim=-1)
+        v_real = torch.matmul(attn_weights, v.real)
+        v_imag = torch.matmul(attn_weights, v.imag)
+        return torch.complex(v_real, v_imag)
+
+class SigmoidGatingMask(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.mask = nn.Parameter(torch.ones(dim)) 
+    def forward(self, z):
+        filter_val = torch.sigmoid(self.mask)
+        real = z.real * filter_val
+        imag = z.imag * filter_val
+        return torch.complex(real, imag), filter_val
+
+class InsightOperator(nn.Module):
+    def __init__(self, dim, compression_ratio=4):
+        super().__init__()
+        self.dim = dim
+        self.project = nn.Linear(dim*2, dim // compression_ratio, bias=False)
+        self.expand = nn.Linear(dim // compression_ratio, dim*2, bias=False)
+    def forward(self, z):
+        flat = torch.cat([z.real, z.imag], dim=-1)
+        compressed = self.project(flat)
+        expanded = self.expand(compressed)
+        return torch.complex(expanded[..., :self.dim], expanded[..., self.dim:])
+
+class SubmodalityShifter(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.controller = nn.Linear(dim*2, 2) 
+    def forward(self, z, active=False):
+        if not active: return z
+        flat = torch.cat([z.real, z.imag], dim=-1)
+        params = self.controller(flat)
+        intensity_mod = 0.5 + torch.sigmoid(params[..., 0:1]) 
+        phase_shift = torch.tanh(params[..., 1:2]) * 0.1
+        mag = torch.abs(z) * intensity_mod
+        phase = torch.angle(z + EPS) + phase_shift
+        return torch.complex(mag * torch.cos(phase), mag * torch.sin(phase))
+
+# ==========================================
+# 4. Controllers (GRU-Safe)
+# ==========================================
+# [ENGINEERING + MATHEMATICAL]
+# Controllers manage the global workspace dynamics across ACT time steps.
+#
+#   RecurrentController : GRU-based meta-controller. Outputs per-module
+#     competition biases and dynamic loss weights. Implements 'meta-learning'
+#     within a single forward pass — the controller learns to weight which
+#     specialist module should dominate at each computational step.
+#     Entropy injection during training (5% noise) prevents monoculture:
+#     no single module should always win (diversity loss enforces this globally).
+#
+#   RecurrentRegularizer: The 'Critic' or 'Devil's Advocate' module (v36 lineage).
+#     Applies a 90° phase rotation (multiplication by i) to the winning state,
+#     generating an adversarial perturbation. This is the ANTITHESIS in the
+#     Hegelian Dialectic: Thesis (winner) + Antithesis (regularizer) = Synthesis.
+#     Trust-weighted: low-trust regularizer contributes less to synthesis.
+#
+#   LinearPredictor    : Predicts the NEXT broadcast state from the CURRENT one.
+#     Prediction error drives both the InsightOperator and loss weighting.
+#     Implements predictive processing / free energy principle at the module level.
+#
+#   InertiaTracker     : Integrates broadcast state through a gated GRU.
+#     Gate is driven by prediction error: high error = high integration rate.
+#     Adds momentum bias to broadcast state. Analogous to thalamic relay
+#     in predictive coding — gates sensory updates based on surprise.
+#
+#   TransitionMonitor  : Measures the magnitude of state change (velocity).
+#     High transition scores trigger the SubmodalityShifter (cognitive reappraisal)
+#     and modulate the plasticity/scale_factor for that step.
+class RecurrentController(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.gru = nn.GRU(dim * 2, dim)
+        self.bias_proj = nn.Linear(dim, CONFIG["n_modules"])
+        self.value_head = nn.Linear(dim, 4) 
+    def forward(self, broadcast_state, prev_context):
+        flat = torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1).float()
+        if prev_context is None:
+            prev_context = torch.zeros(1, flat.size(0), self.gru.hidden_size, device=flat.device)
+        else: prev_context = prev_context.unsqueeze(0)
+        output, new_context = self.gru(flat.unsqueeze(0), prev_context)
+        new_context = new_context.squeeze(0)
+        module_bias = self.bias_proj(new_context)
+        dynamic_values = torch.sigmoid(self.value_head(new_context))
+        
+        # Entropy Injection (Break Monoculture)
+        if self.training:
+            noise = torch.rand_like(dynamic_values)
+            dynamic_values = dynamic_values * 0.95 + noise * 0.05
+            
+        return module_bias, dynamic_values, new_context
+
+class RecurrentRegularizer(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.gru = nn.GRU(dim * 2, dim)
+        self.net = ComplexLinear(dim)
+        self.norm = ComplexLayerNorm(dim)
+    def forward(self, broadcast_state, prev_state):
+        flat = torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1).float()
+        if prev_state is None:
+            prev_state = torch.zeros(1, flat.size(0), self.gru.hidden_size, device=flat.device)
+        else: prev_state = prev_state.unsqueeze(0)
+        output, new_state = self.gru(flat.unsqueeze(0), prev_state)
+        new_state = new_state.squeeze(0)
+        z_ctx = torch.complex(new_state, torch.zeros_like(new_state))
+        z = self.norm(self.net(broadcast_state + z_ctx))
+        return torch.complex(-z.imag, z.real), new_state
+
+class LinearPredictor(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.predictor = nn.Linear(dim * 2, dim * 2)
+    def forward(self, broadcast_state):
+        flat = torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1)
+        pred_flat = self.predictor(flat)
+        return torch.complex(pred_flat[..., :flat.shape[-1]//2], pred_flat[..., flat.shape[-1]//2:])
+
+class InertiaTracker(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.gru = nn.GRU(dim * 2, dim)
+        self.decoder = nn.Linear(dim, dim * 2)
+    def forward(self, broadcast_state, error_signal, prev_state):
+        flat = torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1).float()
+        if prev_state is None:
+            prev_state = torch.zeros(1, flat.size(0), self.gru.hidden_size, device=flat.device, dtype=torch.float32)
+        else: prev_state = prev_state.unsqueeze(0)
+        gate = torch.sigmoid(error_signal)
+        output, new_state = self.gru(flat.unsqueeze(0), prev_state)
+        new_state = new_state.squeeze(0)
+        prev_state = prev_state.squeeze(0)
+        integrated_state = (gate * new_state) + ((1.0 - gate) * prev_state)
+        bias_flat = self.decoder(integrated_state)
+        bias_c = torch.complex(bias_flat[..., :flat.shape[-1]//2], bias_flat[..., flat.shape[-1]//2:])
+        return bias_c, integrated_state
+
+class TransitionMonitor(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(dim, dim), nn.ReLU(), nn.Linear(dim, 1), nn.Sigmoid())
+    def forward(self, current_state, prev_state):
+        if current_state is None or prev_state is None:
+            device = current_state.device if current_state is not None else torch.device('cpu')
+            return torch.tensor(0.0, device=device)
+        delta = current_state - prev_state
+        return self.net(delta)
+
+# ==========================================
+# 5. Specialist Modules (Global Workspace Competitors)
+# ==========================================
+# [ENGINEERING + NEUROLINGUISTIC]
+# The Global Workspace Theory (Baars, 1988; Dehaene et al., 2011) proposes
+# that consciousness arises from a 'global workspace' where specialist
+# modules compete for broadcast access. Only the winning representation
+# is broadcast globally; others continue processing locally.
+#
+# SACRSN implements four specialist modules:
+#
+#   1. ComplexAttentionBlock  [PERCEPTUAL / SYNTACTIC]
+#      Self-attention in C^d over the raw input and broadcast state.
+#      Captures fine-grained structural patterns. Includes a halting head
+#      (ACT): each module can vote to terminate computation early.
+#      The sparse gating mask encourages selectivity (columnar specialisation).
+#
+#   2. DifferentiableStack    [HIERARCHICAL / RECURSIVE MEMORY]
+#      A fully differentiable pushdown automaton. Supports push/pop/noop
+#      operations via soft attention. Enables recursive, stack-based
+#      processing analogous to phrase-structure parsing in linguistics.
+#      Stack depth is tracked and visualised.
+#
+#   3. GraphVectorQuantizer   [SEMANTIC / SYMBOLIC GROUNDING]
+#      The symbolic core. Projects continuous states onto discrete codebook
+#      entries via nearest-neighbour lookup with straight-through gradients.
+#      Maintains the full Belief System, adjacency graph, Hopfield attractor
+#      refinement, and all ecosystem dynamics (pruning, revival, consensus).
+#      This is the SYMBOLIC layer in a neuro-symbolic hybrid.
+#
+#   4. PersistentSensoryInterface [EMBODIED / ENVIRONMENTAL]
+#      Provides persistent, inertia-smoothed sensory context.
+#      Perspective, audio, and chemical sub-modalities are separately embedded
+#      and combined, simulating multi-sensory environmental grounding.
+#      The sensory state decays slowly (inertia=0.9), modelling persistence
+#      of physical context across cognitive time steps.
+class ComplexAttentionBlock(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.linear = ComplexLinear(dim)
+        self.norm = ComplexLayerNorm(dim)
+        self.act = ModReLU(dim)
+        self.attn = ComplexAttention(dim)
+        self.gating = SigmoidGatingMask(dim)
+        self.score_head = nn.Linear(dim * 2, 1)
+        self.conf_head = nn.Linear(dim * 2, 1)
+        self.halt_head = nn.Linear(dim * 2, 1)
+        nn.init.constant_(self.halt_head.bias, -4.0)
+    def forward(self, raw_input, broadcast_state):
+        combined = 0.5 * raw_input + 0.5 * broadcast_state
+        z = self.norm(self.linear(combined))
+        z = self.act(z)
+        z_attn = self.attn(z)
+        proposal, mask_val = self.gating(z_attn)
+        flat = torch.cat([proposal.real, proposal.imag], dim=-1)
+        score = self.score_head(flat)
+        confidence = torch.sigmoid(self.conf_head(flat))
+        halt_logit = self.halt_head(flat)
+        return proposal, score, confidence, halt_logit, mask_val
+
+class DifferentiableStack(nn.Module):
+    def __init__(self, dim, size):
+        super().__init__()
+        self.dim = dim
+        self.size = size
+        self.ctrl_net = nn.Linear(dim * 2, 3)
+        self.score_head = nn.Linear(dim * 2, 1)
+        self.conf_head = nn.Linear(dim * 2, 1)
+    def forward(self, broadcast_state, memory, ptr):
+        flat_in = torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1)
+        control = F.softmax(self.ctrl_net(flat_in), dim=-1)
+        push, pop, noop = control[:, 0].view(-1,1), control[:, 1].view(-1,1), control[:, 2].view(-1,1)
+        ptr_up = torch.roll(ptr, 1, dims=1)
+        ptr_down = torch.roll(ptr, -1, dims=1)
+        new_ptr = (push * ptr_up) + (pop * ptr_down) + (noop * ptr)
+        new_ptr = new_ptr / (new_ptr.sum(dim=1, keepdim=True) + EPS)
+        write_mask = push * ptr_up
+        write_val = write_mask.unsqueeze(2) * flat_in.unsqueeze(1)
+        retain_mask = 1.0 - write_mask.unsqueeze(2)
+        new_memory = write_val + (memory * retain_mask)
+        read_mask = new_ptr.unsqueeze(2)
+        read_flat = torch.sum(new_memory * read_mask, dim=1)
+        proposal = torch.complex(read_flat[:, :self.dim], read_flat[:, self.dim:])
+        score = self.score_head(read_flat)
+        confidence = torch.sigmoid(self.conf_head(read_flat))
+        return proposal, score, confidence, new_memory, new_ptr
+
+class GraphVectorQuantizer(nn.Module):
+    def __init__(self, latent_dim, n_symbols):
+        super().__init__()
+        self.codebook = nn.Parameter(torch.empty(n_symbols, latent_dim*2))
+        nn.init.uniform_(self.codebook, -0.5, 0.5)
+        
+        # Semantic Anchoring
+        self.register_buffer("codebook_anchor", self.codebook.detach().clone())
+        
+        self.adjacency = nn.Parameter(torch.zeros(n_symbols, n_symbols))
+        self.register_buffer("edge_usage", torch.zeros(n_symbols, n_symbols))
+        self.context_gate = nn.Linear(latent_dim * 2, n_symbols)
+        self.register_buffer("symbol_usage", torch.ones(n_symbols))
+        self.dead_limit = 0.1
+        self.score_head = nn.Linear(latent_dim * 2, 1)
+        self.conf_head = nn.Linear(latent_dim * 2, 1)
+        self.beliefs = {i: Belief(i) for i in range(n_symbols)}
+
+    def iterative_attractor_refinement(self, z, steps):
+        z_clean = z.clone()
+        beta = CONFIG["inverse_temperature"]
+        for _ in range(steps):
+            energy = torch.matmul(z_clean, self.codebook.t())
+            attn = F.softmax(energy * beta, dim=-1)
+            z_clean = torch.matmul(attn, self.codebook)
+        return z_clean
+
+    def restructure(self, active_indices, strength=0.1):
+        with torch.no_grad():
+            if len(active_indices) > 1:
+                indices = active_indices.cpu().numpy()
+                for i in indices:
+                    for j in indices:
+                        if i != j:
+                            self.adjacency[i, j] += strength
+                            self.adjacency[j, i] += strength
+            self.adjacency.data = torch.tanh(self.adjacency.data)
+
+    def redefine_symbol(self, indices, target_vecs, rate=0.3):
+        with torch.no_grad():
+            for i in range(indices.size(0)):
+                sym_id = indices[i].item()
+                target = target_vecs[i]
+                
+                # Adaptive Anchoring
+                usage = self.symbol_usage[sym_id].item()
+                tether = 0.01 * min(1.0, usage / 1000.0) # Maturity check
+                
+                delta_target = target - self.codebook.data[sym_id]
+                delta_anchor = self.codebook_anchor[sym_id] - self.codebook.data[sym_id]
+                
+                self.codebook.data[sym_id] += (rate * delta_target) + (tether * delta_anchor)
+
+    def extinguish(self, prev_sym, curr_sym, strength=0.05):
+        with torch.no_grad():
+            for b in range(prev_sym.size(0)):
+                p = prev_sym[b].item()
+                c = curr_sym[b].item()
+                self.adjacency.data[p, c] = max(-1.0, self.adjacency.data[p, c] - strength)
+
+    def revive_dead_entries(self, z_flat_batch):
+        dead_mask = self.symbol_usage < self.dead_limit
+        if not dead_mask.any(): return
+        dead_indices = torch.nonzero(dead_mask).squeeze(1)
+        with torch.no_grad():
+            rand_indices = torch.randperm(z_flat_batch.size(0))[:len(dead_indices)]
+            rand_inputs = z_flat_batch[rand_indices]
+            if rand_inputs.size(0) < len(dead_indices):
+                diff = len(dead_indices) - rand_inputs.size(0)
+                noise = torch.randn(diff, self.codebook.size(1), device=self.codebook.device) * 0.1
+                replacements = torch.cat([rand_inputs, noise], dim=0)
+            else: replacements = rand_inputs
+            self.codebook.data[dead_indices] = replacements
+            # Reset anchor
+            self.codebook_anchor[dead_indices] = replacements
+            self.symbol_usage[dead_indices] = 1.0
+            self.adjacency.data[dead_indices, :] = 0.0
+            self.adjacency.data[:, dead_indices] = 0.0
+
+    def decay_stale_beliefs(self, current_epoch):
+        for b in self.beliefs.values():
+            if b.last_update_epoch < current_epoch:
+                b.decay()
+
+    def strongest_beliefs(self, k=5):
+        return sorted(
+            self.beliefs.values(),
+            key=lambda b: b.confidence * abs(b.support),
+            reverse=True
+        )[:k]
+
+    def reconcile_perspectives(self):
+        print("  > Reality Reconciliation: Merging perspective bubbles...")
+        for b in self.beliefs.values():
+            global_rel = b.get_reliability(-1)
+            for p in list(b.perspective_hits.keys()):
+                b.perspective_hits[p] *= 0.98
+                b.perspective_total[p] *= 0.98
+            
+            # Confidence Inertia Damping
+            safe_support = min(1.0, abs(b.support))
+            b.confidence = (
+                0.85 * b.confidence +
+                0.1 * global_rel +
+                0.05 * (1.0 - safe_support)
+            )
+
+    # Consensus Sync with Streak Gating
+    def consensus_sync(self):
+        print("  > Consensus Sync: Enforcing reliability norms...")
+        all_rels = [b.get_reliability(-1) for b in self.beliefs.values()]
+        if not all_rels: return
+        avg_rel = np.mean(all_rels)
+        
+        cull_count = 0
+        protected_count = 0
+        boost_count = 0
+        
+        for b in self.beliefs.values():
+            rel = b.get_reliability(-1)
+            
+            # Culling / Protection
+            if rel < avg_rel * 0.5:
+                if abs(b.support) > 0.6:
+                    b.confidence *= 0.99
+                    protected_count += 1
+                else:
+                    b.confidence *= 0.95
+                    cull_count += 1
+            # Breakthrough Boost with Streak Check
+            elif rel > avg_rel * 1.2 and abs(b.support) > 0.6 and b.proven_streak > 5:
+                b.confidence = min(0.99, b.confidence * 1.05)
+                boost_count += 1
+        
+        print(f"    - Penalized {cull_count} beliefs. Protected {protected_count}. Boosted {boost_count} innovators.")
+
+    # [PATCH 1] Ecosystem Pruning
+    def prune_ecosystem(self):
+        print("  > Ecosystem Pruning: Removing unfit beliefs...")
+        # Fitness = Confidence * Support * Usage
+        # We target the bottom 2%
+        fitness_scores = []
+        for i, b in self.beliefs.items():
+            usage = self.symbol_usage[i].item()
+            fitness = b.confidence * abs(b.support) * usage
+            fitness_scores.append((fitness, i))
+        
+        # Sort ascending
+        fitness_scores.sort(key=lambda x: x[0])
+        
+        cutoff = int(len(fitness_scores) * 0.02)
+        doomed = [x[1] for x in fitness_scores[:cutoff]]
+        
+        with torch.no_grad():
+            self.symbol_usage[doomed] = 0.0 # Revive entries will pick these up
+            # Reset beliefs
+            for d in doomed:
+                self.beliefs[d] = Belief(d) # Hard reset
+        
+        print(f"    - Pruned {len(doomed)} weak beliefs.")
+
+    def forward(self, broadcast_state, prev_symbol_idx=None, scale_factor=1.0, noise_offset=None, epoch=0, global_step=0, p_idx=-1):
+        z_flat = torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1)
+        if noise_offset is not None: z_flat = z_flat + noise_offset
+        d = torch.sum(z_flat**2, dim=-1, keepdim=True) + torch.sum(self.codebook**2, dim=-1) - 2 * torch.matmul(z_flat, self.codebook.t())
+        
+        # Context-Dependent Expectation Bias
+        with torch.no_grad():
+            expectations = torch.zeros(self.codebook.size(0), device=z_flat.device)
+            for i, b in self.beliefs.items():
+                rel = b.get_reliability(p_idx)
+                expectations[i] = b.confidence * rel
+            
+            belief_bias = 1.0 - (0.1 * expectations.unsqueeze(0))
+        
+        d = d * belief_bias
+        
+        ctx_logits = self.context_gate(z_flat.detach()) 
+        ctx_mask = torch.sigmoid(ctx_logits)
+        scope_strength = min(1.0, epoch / 500.0)
+        d = d * (1.0 + (ctx_mask * 2.0 * scope_strength))
+        
+        if prev_symbol_idx is not None:
+            graph_prior = self.adjacency[prev_symbol_idx]
+            raw_bias = (CONFIG["prior_bias_scale"] / scale_factor) * torch.sigmoid(graph_prior)
+            bias = torch.clamp(raw_bias, max=0.5)
+            d = d - bias
+        temp_anneal = max(0.3, 1.0 - global_step / 50000.0)
+        d = d / temp_anneal
+        min_indices = torch.argmin(d, dim=-1)
+        z_q = F.embedding(min_indices, self.codebook)
+        if self.training:
+            with torch.no_grad():
+                self.symbol_usage *= 0.9995 
+                curr_usage = torch.bincount(min_indices, minlength=self.codebook.size(0)).float()
+                self.symbol_usage += (curr_usage * 0.1) 
+                if prev_symbol_idx is not None:
+                    self.edge_usage *= 0.99 
+                    for b in range(min_indices.size(0)):
+                        p = prev_symbol_idx[b].item()
+                        c = min_indices[b].item()
+                        self.edge_usage[p, c] += 1.0
+                self.revive_dead_entries(z_flat.detach())
+        loss_vq = F.mse_loss(z_q, z_flat.detach())
+        loss_commit = F.mse_loss(z_q.detach(), z_flat)
+        z_q = z_flat + (z_q - z_flat).detach()
+        proposal = torch.complex(z_q[..., :z_flat.shape[-1]//2], z_q[..., z_flat.shape[-1]//2:])
+        dist_score = -torch.min(d, dim=-1, keepdim=True)[0]
+        score = self.score_head(z_q) + (0.1 * dist_score)
+        confidence = torch.sigmoid(self.conf_head(z_q))
+        if self.training:
+            with torch.no_grad():
+                for b in range(min_indices.size(0)):
+                    sym = min_indices[b].item()
+                    self.beliefs[sym].update(score=score[b], confidence=confidence[b], epoch=epoch, note="reinforced", p_idx=p_idx)
+                if prev_symbol_idx is not None:
+                    for b in range(prev_symbol_idx.size(0)):
+                        p = prev_symbol_idx[b].item()
+                        c = min_indices[b].item()
+                        w = torch.sigmoid(self.adjacency[p, c]).item()
+                        if w < 0.2: 
+                            self.beliefs[p].contradict(severity=1.0 - w)
+                            if self.beliefs[p].confidence > 0.8:
+                                self.beliefs[p].reframe(f"Contradiction at epoch {epoch}", epoch)
+
+        total_loss = loss_vq + loss_commit * CONFIG["commitment_cost"]
+        return proposal, score, confidence, total_loss, min_indices
+
+class PersistentSensoryInterface(nn.Module):
+    def __init__(self, dim):
+        super().__init__()
+        self.dim = dim
+        self.perspective_emb = nn.Embedding(CONFIG["n_perspective_embs"], dim)
+        self.audio_emb = nn.Embedding(CONFIG["n_audio_embs"], dim)
+        self.chem_emb_1 = nn.Embedding(CONFIG["n_chem_embs"], dim*2)
+        self.chem_emb_2 = nn.Embedding(CONFIG["n_chem_embs"], dim*2)
+        self.register_buffer("env_state", torch.zeros(1, dim*2))
+        self.score_head = nn.Linear(dim * 2, 1)
+        self.conf_head = nn.Linear(dim * 2, 1)
+    def forward(self, batch_size, device):
+        noise = torch.randn(1, self.dim*2, device=device)
+        self.env_state = (CONFIG["sensory_inertia"] * self.env_state) + ((1.0 - CONFIG["sensory_inertia"]) * noise)
+        current_world = self.env_state.expand(batch_size, -1)
+        p_idx = torch.randint(0, CONFIG["n_perspective_embs"], (batch_size,), device=device)
+        p_emb = self.perspective_emb(p_idx)
+        a_idx = torch.randint(0, CONFIG["n_audio_embs"], (batch_size,), device=device)
+        a_emb = self.audio_emb(a_idx)
+        c1_idx = torch.randint(0, CONFIG["n_chem_embs"], (batch_size,), device=device)
+        c2_idx = torch.randint(0, CONFIG["n_chem_embs"], (batch_size,), device=device)
+        detail_vec = self.chem_emb_1(c1_idx) + self.chem_emb_2(c2_idx)
+        full_sensory = current_world + detail_vec
+        real_part = full_sensory[:, :self.dim] + p_emb
+        imag_part = full_sensory[:, self.dim:] + a_emb
+        proposal = torch.complex(real_part, imag_part)
+        rand_val = torch.randn(batch_size, 1, device=device)
+        flat = torch.cat([real_part, imag_part], dim=-1)
+        score = self.score_head(flat) + rand_val
+        confidence = torch.sigmoid(self.conf_head(flat))
+        
+        # [VERIFIED: p_idx return]
+        return proposal, score, confidence, full_sensory, p_idx[0].item()
+
+# ==========================================
+# 6. Master Model: ComplexRecurrentModel
+# ==========================================
+# [MATHEMATICAL + ENGINEERING + NEUROLINGUISTIC — SYNTHESIS]
+# ComplexRecurrentModel is the full architecture integrating all subsystems.
+#
+# FORWARD PASS LOOP (per ACT time step t):
+#   1. Temperature injection: adds a small temporal bias to broadcast state,
+#      preventing state collapse and providing intrinsic time-awareness.
+#   2. Prediction: LinearPredictor forecasts next state. Error drives gates.
+#   3. Inertia: InertiaTracker integrates error-gated momentum into state.
+#   4. Transition monitoring: velocity of state change measured.
+#   5. SubmodalityShift: if flux > 0.5, shift modality (reappraisal trigger).
+#   6. Insight check: if error AND flux exceed thresholds, InsightOperator
+#      fires (bottleneck compression). Restructures and redefines VQ symbols.
+#      Forced Insight: fires under extreme error even without high flux
+#      (analogous to an 'impasse' in problem solving — Ohlsson, 1992).
+#   7. Module competition: all 4 specialists produce proposals + scores.
+#      RecurrentController biases competition with learned module priors.
+#      GWT broadcast selects winner; shadow (soft attention) provides
+#      the antithesis; regularizer provides the critic synthesis.
+#   8. State update: winner + shadow + trust-weighted critic = new broadcast.
+#   9. Hopfield refinement: iterative attractor convergence of the new state.
+#  10. Calibration: situated per-perspective belief reliability update.
+#  11. ACT halting: probability accumulates; terminates when threshold met.
+#  12. VQ extinguish: under high error + low flux, weaken the last transition
+#      edge (extinction learning / Hebbian anti-reinforcement).
+#
+# OUTPUT:
+#   logits, next_hidden, prev_sym, and 14 diagnostic scalars for logging.
+class ComplexRecurrentModel(nn.Module):
+    def __init__(self, vocab_size, dim):
+        super().__init__()
+        self.dim = dim
+        self.emb_mag = nn.Embedding(vocab_size, dim)
+        self.emb_phase = nn.Parameter(torch.randn(vocab_size, dim))
+        
+        self.controller = RecurrentController(dim)
+        self.regularizer = RecurrentRegularizer(dim)
+        self.predictor = LinearPredictor(dim)
+        self.sensory_predictor = nn.Linear(dim * 2, dim * 2)
+        self.inertia_tracker = InertiaTracker(dim)
+        self.transition_monitor = TransitionMonitor(dim)
+        self.insight_op = InsightOperator(dim)
+        self.submodality_shifter = SubmodalityShifter(dim)
+        self.attn_block = ComplexAttentionBlock(dim)
+        self.stack = DifferentiableStack(dim, CONFIG["stack_size"])
+        self.vq_module = GraphVectorQuantizer(dim, CONFIG["n_symbols"])
+        self.noise_module = PersistentSensoryInterface(dim)
+        self.decoder = nn.Linear(dim*2, vocab_size)
+        
+        self.register_buffer("prev_sym_soft", torch.zeros(CONFIG["n_symbols"]))
+        self.register_buffer("long_term_values", torch.ones(4) * 0.5) 
+        self.register_buffer("regularizer_trust", torch.tensor(0.5))
+        self.last_insight_step = -100 
+
+    def embed(self, idx):
+        r = self.emb_mag(idx)
+        t = self.emb_phase[idx]
+        return torch.complex(r*torch.cos(t), r*torch.sin(t))
+
+    def forward(self, input_ids, hidden=None, prev_sym=None, competition_scale=1.0, epoch=0, global_step=0):
+        batch_size = input_ids.size(0)
+        z_in = self.embed(input_ids).squeeze(1)
+        if hidden is None:
+            broadcast_state = torch.zeros_like(z_in)
+            ctrl_ctx = None
+            reg_state = None
+            tracker_state = torch.zeros(batch_size, self.dim, device=z_in.device, dtype=torch.float32)
+            prev_tracker_step = tracker_state.clone()
+            stack_mem = torch.zeros(batch_size, CONFIG["stack_size"], self.dim*2, device=z_in.device)
+            stack_ptr = torch.zeros(batch_size, CONFIG["stack_size"], device=z_in.device)
+            stack_ptr[:, 0] = 1.0
+        else:
+            broadcast_state, ctrl_ctx, reg_state, tracker_state, stack_mem, stack_ptr = hidden
+            prev_tracker_step = tracker_state.clone()
+
+        act_penalty = 0
+        vq_loss_total = 0
+        consistency_loss_total = 0
+        sparse_reg_accum = 0
+        error_accum = torch.zeros((), device=z_in.device)
+        uncertainty_accum = 0
+        entropy_loss_accum = 0 
+        transition_diff_accum = 0 
+        sensory_pred_loss_accum = 0
+        meta_value_accum = torch.zeros(4, device=z_in.device)
+        halting_probability = torch.zeros(batch_size, 1, device=z_in.device)
+        remain = torch.ones(batch_size, 1, device=z_in.device)
+        module_wins = torch.zeros(CONFIG["n_modules"], device=z_in.device)
+        stack_depth_sum = torch.tensor(0.0, device=z_in.device)
+        broadcast_weighted = torch.zeros_like(broadcast_state)
+        insight_triggered_count = 0
+
+        for t in range(CONFIG["max_steps"]):
+            temp_val = torch.tensor(0.1 * (t+1), device=z_in.device).view(1,1)
+            temp_emb = temp_val.repeat(batch_size, self.dim)
+            broadcast_state = broadcast_state + torch.complex(temp_emb, torch.zeros_like(temp_emb))
+
+            expected_state = self.predictor(broadcast_state)
+            sensory_forecast = self.sensory_predictor(torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1))
+            mod_bias, dynamic_values, ctrl_ctx = self.controller(broadcast_state, ctrl_ctx)
+            meta_value_accum = meta_value_accum + dynamic_values.mean(dim=0)
+
+            norm_factor = (self.dim * 2) ** 0.5
+            inst_error = torch.norm(torch.cat([expected_state.real, expected_state.imag], dim=-1), dim=-1, keepdim=True) / norm_factor
+            tracker_bias, tracker_state = self.inertia_tracker(broadcast_state, inst_error, tracker_state)
+            broadcast_state = broadcast_state + tracker_bias
+
+            trans_score = self.transition_monitor(tracker_state, prev_tracker_step)
+            transition_diff_accum = transition_diff_accum + trans_score.mean()
+            prev_tracker_step = tracker_state.clone()
+
+            avg_err = inst_error.mean()
+            avg_flux = trans_score.mean()
+
+            if avg_flux > 0.5: broadcast_state = self.submodality_shifter(broadcast_state, active=True)
+
+            insight_allowed = (global_step - self.last_insight_step) > CONFIG["insight_refractory"]
+            
+            # Forced Insight (Cognitive Interrupt)
+            force_insight = (avg_err > 0.95 and self.regularizer_trust < 0.2)
+            
+            if (insight_allowed and avg_err > CONFIG["insight_error_threshold"] and avg_flux > CONFIG["insight_flux_threshold"]) or force_insight:
+                broadcast_state = self.insight_op(broadcast_state)
+                if self.training and prev_sym is not None:
+                    self.vq_module.restructure(prev_sym.unique(), strength=CONFIG["restructure_strength"])
+                    z_flat = torch.cat([broadcast_state.real, broadcast_state.imag], dim=-1)
+                    self.vq_module.redefine_symbol(prev_sym, z_flat.detach(), rate=CONFIG["redefinition_rate"])
+                insight_triggered_count += 1
+                self.last_insight_step = global_step
+
+            if t == 0: base_p = CONFIG["plasticity_base"]
+            else: base_p = CONFIG["plasticity_base"] + (error_accum / t) * CONFIG["plasticity_scale"]
+            scale_factor = base_p * (1.0 - (CONFIG["transition_diff_weight"] * trans_score.mean().item()))
+            scale_factor = max(0.1, min(scale_factor, 5.0))
+
+            proc_prop, proc_score, proc_conf, proc_halt, mask_val = self.attn_block(z_in, broadcast_state)
+            sparse_reg_accum = sparse_reg_accum + torch.sum(mask_val**2)
+            stack_prop, stack_score, stack_conf, stack_mem, stack_ptr = self.stack(broadcast_state, stack_mem, stack_ptr)
+            curr_depth = torch.sum(stack_ptr * torch.arange(CONFIG["stack_size"], device=z_in.device), dim=1)
+            stack_depth_sum = stack_depth_sum + curr_depth.mean()
+            
+            sens_prop, sens_score, sens_conf, sens_vec, p_idx = self.noise_module(batch_size, z_in.device)
+            
+            sensory_pred_loss_accum = sensory_pred_loss_accum + F.mse_loss(sensory_forecast, sens_vec.detach())
+            
+            # Pass p_idx to VQ for context-aware expectation
+            sem_prop, sem_score, sem_conf, vq_loss, sym_idx = self.vq_module(broadcast_state, prev_sym, scale_factor, noise_offset=sens_vec, epoch=epoch, global_step=global_step, p_idx=p_idx)
+
+            if self.training and prev_sym is not None and epoch > 300:
+                if avg_err > CONFIG["extinction_threshold"] and avg_flux < CONFIG["insight_flux_threshold"]:
+                    self.vq_module.extinguish(prev_sym, sym_idx, strength=CONFIG["extinction_strength"])
+
+            proposals = torch.stack([proc_prop, stack_prop, sem_prop, sens_prop], dim=1)
+            raw_scores = torch.cat([proc_score, stack_score, sem_score, sens_score], dim=1)
+            confidences = torch.cat([proc_conf, stack_conf, sem_conf, sens_conf], dim=1)
+            effective_score = raw_scores + (mod_bias * competition_scale)
+            access_weights = F.softmax(effective_score / CONFIG["temperature"], dim=-1)
+            winner_vals, winner_idx = torch.max(access_weights, dim=1)
+            for w in winner_idx: module_wins[w] += 1
+    
+            masked_weights = access_weights.clone()
+            masked_weights.scatter_(1, winner_idx.unsqueeze(1), -1e9)
+            soft_weights = F.softmax(masked_weights, dim=-1)
+            weights_soft_c = torch.complex(soft_weights.unsqueeze(-1), torch.zeros_like(soft_weights.unsqueeze(-1)))
+            soft_vec = torch.sum(proposals * weights_soft_c, dim=1)
+            weights_c = torch.complex(access_weights.unsqueeze(-1), torch.zeros_like(access_weights.unsqueeze(-1)))
+            winner_vec = torch.sum(proposals * weights_c, dim=1)
+
+            reg_vec, reg_state = self.regularizer(winner_vec, reg_state)
+            reg_weight = self.regularizer_trust.item() * CONFIG["regularizer_weight"]
+            state_next = winner_vec + (CONFIG["soft_attention_weight"] * soft_vec) + (reg_weight * reg_vec)
+            state_next_flat = torch.cat([state_next.real, state_next.imag], dim=-1)
+
+            if self.training:
+                steps = max(0, CONFIG["refinement_steps"] - int(epoch / 300))
+                if steps > 0: state_clean_flat = self.vq_module.iterative_attractor_refinement(state_next_flat, steps=steps)
+                else: state_clean_flat = state_next_flat
+            else: state_clean_flat = state_next_flat
+
+            state_next = torch.complex(state_clean_flat[..., :self.dim], state_clean_flat[..., self.dim:])
+            
+            # Calculate Error for Calibration
+            current_diff = torch.norm(torch.cat([state_next.real, state_next.imag], dim=-1) - 
+                                  torch.cat([expected_state.real, expected_state.imag], dim=-1), dim=-1) / norm_factor
+            
+            # Situated Calibration
+            if self.training:
+                with torch.no_grad():
+                    sym = sym_idx[0].item()
+                    err = current_diff[0].item()
+                    self.vq_module.beliefs[sym].calibrate(err, p_idx)
+
+            error_accum = error_accum + current_diff.mean()
+            uncertainty_accum = uncertainty_accum + torch.mean(1.0 - confidences)
+            step_trust = 1.0 / (1.0 + current_diff.mean().item())
+            with torch.no_grad():
+                self.regularizer_trust = (CONFIG["trust_momentum"] * self.regularizer_trust) + ((1.0 - CONFIG["trust_momentum"]) * step_trust)
+
+            entropy_penalty = uncertainty_accum * torch.tanh(1.0 / (error_accum + EPS))
+            entropy_loss_accum = entropy_loss_accum + entropy_penalty
+            max_score = torch.max(effective_score, dim=1, keepdim=True)[0]
+            activation_gate = torch.sigmoid((max_score - 0.0) * 5.0)
+            
+            next_bcast = (torch.tanh(state_next.real) + 1j * torch.tanh(state_next.imag)) * activation_gate
+            broadcast_state = stabilize_complex(next_bcast)
+
+            p_halt = torch.sigmoid(proc_halt)
+            still_running = (halting_probability < CONFIG["halt_threshold"]).float()
+            p = p_halt * still_running
+            if t == CONFIG["max_steps"] - 1: p = remain
+            p_complex = torch.complex(p, torch.zeros_like(p))
+            
+            broadcast_weighted = broadcast_weighted + p_complex * broadcast_state
+            halting_probability = halting_probability + p
+            remain = remain - p
+            
+            act_penalty = act_penalty + still_running.mean()
+            vq_loss_total = vq_loss_total + vq_loss
+            if prev_sym is not None:
+                row_logits = self.vq_module.adjacency[prev_sym]
+                consistency_loss_total = consistency_loss_total + F.cross_entropy(row_logits.view(-1, CONFIG["n_symbols"]), sym_idx.view(-1))
+            prev_sym = sym_idx
+
+        avg_meta_values = meta_value_accum / CONFIG["max_steps"]
+        with torch.no_grad():
+            self.long_term_values = (CONFIG["momentum"] * self.long_term_values) + ((1.0 - CONFIG["momentum"]) * avg_meta_values.detach())
+
+        features = torch.cat([broadcast_weighted.real, broadcast_weighted.imag], dim=-1)
+        logits = self.decoder(features)
+        next_hidden = (broadcast_weighted, ctrl_ctx, reg_state, tracker_state, stack_mem, stack_ptr)
+        avg_stack_depth = stack_depth_sum / CONFIG["max_steps"]
+
+        return logits, next_hidden, prev_sym, act_penalty, vq_loss_total, consistency_loss_total, \
+               module_wins, sparse_reg_accum, avg_stack_depth, error_accum, uncertainty_accum, \
+               avg_meta_values, entropy_loss_accum, transition_diff_accum, self.regularizer_trust, \
+               insight_triggered_count, sensory_pred_loss_accum
+
+# ==========================================
+# 7. Training Engine
+# ==========================================
+# [ENGINEERING]
+# AdamW optimizer with (β₁=0.9, β₂=0.98, wd=1e-3) — tuned for transformer-
+# style complex state networks (weight decay prevents codebook collapse).
+#
+# Composite Loss (dynamically weighted via meta-controller outputs):
+#   L = L_token  [cross-entropy on next-token prediction]
+#     + L_act    [ACT step penalty — encourages early halting]
+#     + L_vq     [VQ commitment + codebook loss]
+#     + L_entropy[exploration bonus — negative entropy reward]
+#     + L_div    [diversity loss — prevents symbol monoculture]
+#     + L_consist[graph topology consistency]
+#     + L_sparse [L2 gating sparsity]
+#     + L_pred   [prediction error — free energy minimisation]
+#     + L_uncert [uncertainty regularisation]
+#     + L_insight[entropy × reciprocal error — 'courage' term]
+#     + L_sensory[sensory prediction accuracy]
+#
+# Scheduled triggers (neurolinguistic maintenance cycles):
+#   Every  500 epochs: Reality Reconciliation (merge perspective bubbles)
+#   Every 1000 epochs: Consensus Sync (cull underperforming / boost innovators)
+#   Every 2000 epochs: Ecosystem Pruning (hard cull bottom-2% by fitness)
+#
+# LR schedule: linear warmup (500 steps) → exponential decay (0.9995^step)
+def train():
+    model = ComplexRecurrentModel(vocab_size, CONFIG["embedding_dim"]).to(DEVICE)
+    
+    # [VERIFIED: Param Count]
+    param_count = sum(p.numel() for p in model.parameters())
+    print(f"Model Parameters: {param_count:,}")
+    
+    optimizer = torch.optim.AdamW(
+        model.parameters(),
+        lr=CONFIG["learning_rate"],
+        betas=(0.9, 0.98),
+        weight_decay=1e-3
+    )
+
+    def lr_lambda(step):
+        if step < 500: return (step + 1) / 500
+        else: return max(0.1, 0.9995 ** (step - 500))
+
+    scheduler = torch.optim.lr_scheduler.LambdaLR(optimizer, lr_lambda)
+    
+    def loss_weights(step):
+        return {
+            "token": 1.0, "vq": min(1.0, step / 1000.0), 
+            "entropy": max(0.1, 1.0 - step / 5000.0),
+            "diversity": min(0.5, step / 2000.0),
+            "prediction": min(1.0, step / 1500.0),
+            "insight": min(0.3, step / 3000.0), "trust": 0.1
+        }
+    
+    print(f"--- Training SACRSN v41.0 (Unified) ---")
+    global_step = 0
+    
+    try:
+        for epoch in range(CONFIG["epochs"]):
+            hidden = None
+            prev_sym = None
+            
+            # [VERIFIED: Accumulators]
+            total_loss = 0
+            total_act = 0
+            total_error = 0
+            total_depth = 0
+            total_grounding = 0
+            total_trust = 0
+            total_insights = 0
+            avg_meta = torch.zeros(4, device=DEVICE)
+            
+            comp_scale = 0.5 if epoch < 300 else 1.0
+            
+            # [NEW] Reconciliation Triggers
+            if epoch > 0:
+                if epoch % 500 == 0: model.vq_module.reconcile_perspectives()
+                if epoch % 1000 == 0: model.vq_module.consensus_sync()
+                # [PATCH 1] Ecosystem Pruning
+                if epoch % 2000 == 0: model.vq_module.prune_ecosystem()
+
+            with torch.no_grad():
+                model.vq_module.adjacency.data *= (1.0 - CONFIG["synaptic_decay"])
+                usage_norm = model.vq_module.edge_usage / (model.vq_module.edge_usage.max() + 1e-6)
+                metric = torch.abs(model.vq_module.adjacency.data) + (0.5 * usage_norm)
+                mask = metric > CONFIG["pruning_threshold"]
+                model.vq_module.adjacency.data *= mask.float()
+            
+            step_limit = min(len(data_tensor) - 1, 50) 
+            start_idx = random.randint(0, max(0, len(data_tensor) - step_limit - 1))
+            
+            for i in range(start_idx, start_idx + step_limit):
+                global_step += 1
+                x = data_tensor[i].view(1, 1)
+                y = data_tensor[i+1].view(1)
+                
+                logits, hidden, sym_idx, act_pen, vq_loss, norm_loss, _, sparse_reg, step_depth, error, uncertainty, meta_vals, entropy_pen, trans_diff, trust, insights_count, sens_loss = model(x, hidden, prev_sym, competition_scale=comp_scale, epoch=epoch, global_step=global_step)
+                
+                gw, exc, crit, narr, smem, sptr = hidden
+                hidden = (gw.detach(), exc.detach(), crit.detach(), narr.detach(), smem.detach(), sptr.detach())
+                prev_sym = sym_idx.detach()
+                
+                token_loss = F.cross_entropy(logits, y)
+                act_loss = CONFIG["step_penalty"] * act_pen
+                probs = F.softmax(logits, dim=-1)
+                
+                # Negative weight * negative entropy = Positive reward for high entropy (Exploration)
+                entropy_loss_val = -(probs * torch.log(probs + EPS)).sum()
+                
+                curr_onehot = F.one_hot(sym_idx, CONFIG["n_symbols"]).float()
+                if curr_onehot.dim() > 1: curr_onehot = curr_onehot.view(-1)
+                with torch.no_grad(): model.prev_sym_soft.copy_(model.prev_sym_soft * 0.9 + curr_onehot * 0.1)
+                div_loss = (model.prev_sym_soft * torch.log(model.prev_sym_soft + EPS)).sum()
+                w_norm, w_div, w_err, w_unc = meta_vals[0], meta_vals[1], meta_vals[2], meta_vals[3]
+                
+                lw = loss_weights(global_step)
+                
+                # [VERIFIED: Loss Rebinding]
+                pred_weight = lw["prediction"]
+                if error.item() > 2.0:
+                    pred_weight *= 2.0
+                
+                loss = (lw["token"] * token_loss) + act_loss + (lw["vq"] * vq_loss) + \
+                       (lw["entropy"] * entropy_loss_val * -0.01) + (lw["diversity"] * div_loss * w_div) + \
+                       (CONFIG["consistency_loss_weight"] * norm_loss * w_norm) + (CONFIG["sparse_reg_weight"] * sparse_reg) + \
+                       (pred_weight * error * w_err) + (lw["trust"] * uncertainty * w_unc) + \
+                       (lw["insight"] * entropy_pen) + (lw["prediction"] * sens_loss)
+                
+                optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(model.parameters(), CONFIG["grad_clip"])
+                optimizer.step()
+                scheduler.step()
+                
+                total_loss += loss.item()
+                total_act += (1.0 + act_pen.item())
+                total_error += error.item()
+                total_depth += step_depth.item()
+                total_grounding += sens_loss.item()
+                total_trust += trust.item()
+                total_insights += insights_count
+                avg_meta += meta_vals.detach()
+            
+            model.vq_module.decay_stale_beliefs(epoch)
+            
+            if epoch % 1 == 0:
+                a_loss = total_loss / step_limit
+                a_act = total_act / step_limit
+                a_err = total_error / step_limit
+                a_dep = total_depth / step_limit
+                a_gnd = total_grounding / step_limit
+                a_tst = total_trust / step_limit
+                a_meta = (avg_meta / step_limit).cpu().numpy()
+                lr = scheduler.get_last_lr()[0]
+                
+                print(f"Ep {epoch:04d} | Loss: {a_loss:.3f} | ACT: {a_act:.1f} | Err: {a_err:.3f} | Gnd: {a_gnd:.3f} | Trst: {a_tst:.2f} | Ins: {total_insights} | LR: {lr:.6f} | Vals: {np.round(a_meta, 2)}")
+                
+                if a_loss < 0.1: 
+                    print("\n--- CONVERGENCE REACHED ---")
+                    return model
+
+    except KeyboardInterrupt:
+        print("\nInterrupted.")
+    
+    return model
+
+# ==========================================
+# 8. Visualization & Interaction Suite
+# ==========================================
+# [NEUROLINGUISTIC INTERPRETABILITY]
+# Nine diagnostic charts are produced post-training:
+#
+#   1. graph_topology        — NetworkX spring layout of the VQ adjacency graph.
+#      Node colour: blue = lexically grounded, pink = latent/unused.
+#      Edge width: proportional to learned transition probability.
+#      This is the model's SEMANTIC MAP.
+#
+#   2. module_competition    — Win counts per module per inference step.
+#      Reveals which cognitive process dominates at different moments.
+#
+#   3. stack_depth           — Average differentiable stack depth over steps.
+#      Encodes recursive/hierarchical processing depth.
+#
+#   4. act_profile           — ACT steps used per token.
+#      High values = more computation needed (hard tokens).
+#
+#   5. error_signal          — Prediction error trajectory.
+#      Insight events appear as sharp drops following a spike.
+#
+#   6. phase_plot            — 2D trajectory of broadcast state (re vs im).
+#      Reveals attractor basins, limit cycles, and chaotic regimes.
+#
+#   7. loss_weights          — Meta-controller dynamic value trajectory.
+#      Shows how the system rebalances its own learning objectives.
+#
+#   8. transition_magnitude  — State velocity (|Δstate|) over time.
+#      High velocity = cognitive flux / belief instability.
+#
+#   9. ood_detection         — Anomaly scores on OOD input.
+#      High scores = violation expectancy (N400 ERP analogue).
+def visualize_all(model):
+    print("\n--- Generating Diagnostics & Images ---")
+    model.eval()
+    
+    symbol_to_word = defaultdict(list)
+    hidden, prev_sym = None, None
+    with torch.no_grad():
+        for i in range(min(500, len(data_tensor) - 1)):
+            x = data_tensor[i].view(1, 1)
+            _, hidden, prev_sym, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = model(x, hidden, prev_sym)
+            current_word = tokenizer.decode([data_tensor[i].item()])
+            symbol_to_word[prev_sym.item()].append(current_word)
+            
+            if prev_sym is not None:
+                sym_id = prev_sym.item()
+                model.vq_module.beliefs[sym_id].lexical_support[current_word] += 1
+
+    narrator = NarrativeEngine(model.vq_module, tokenizer, symbol_to_word)
+    
+    print("\n=== 🧠 INTROSPECTION REPORT ===")
+    strongest = model.vq_module.strongest_beliefs(k=5)
+    for i, b in enumerate(strongest):
+        snap = b.snapshot()
+        shift = narrator.explain_belief_change(b)
+        print(f"#{i+1}: Symbol {snap['symbol']} ('{snap['grounding']}') | Conf: {snap['confidence']} | Rel: {snap['reliability']} | Strk: {snap['streak']} | {shift}")
+    
+    print("\n--- Paradigm Shift Analysis ---")
+    for i in range(len(strongest)):
+        for j in range(len(strongest)):
+            if i == j: continue
+            b1 = strongest[i]
+            b2 = strongest[j]
+            msg = narrator.explain_replacement(b2.symbol_id, b1.symbol_id) 
+            if msg:
+                print(msg)
+    print("===============================\n")
+
+    # Plot 1: Topology
+    adj_probs = torch.sigmoid(model.vq_module.adjacency).detach().cpu().numpy()
+    G = nx.DiGraph()
+    for i in range(CONFIG["n_symbols"]): G.add_node(i)
+    edges, weights = [], []
+    for i in range(CONFIG["n_symbols"]):
+        for j in range(CONFIG["n_symbols"]):
+            w = adj_probs[i, j]
+            if w > 0.05: 
+                G.add_edge(i, j, weight=w)
+                edges.append((i, j))
+                weights.append(w)
+    plt.figure(figsize=(14, 14))
+    try: pos = nx.spring_layout(G, k=0.15, iterations=50, seed=42)
+    except: pos = nx.circular_layout(G)
+    node_colors = ['#a0cbe2' if i in symbol_to_word else '#ffe5e5' for i in G.nodes()]
+    nx.draw_networkx_nodes(G, pos, node_size=500, alpha=0.8, node_color=node_colors)
+    nx.draw_networkx_edges(G, pos, width=[w*2 for w in weights], alpha=0.5, edge_color='gray', arrowstyle='->', arrowsize=10)
+    labels = {}
+    for i in G.nodes():
+        if i in symbol_to_word:
+            w = max(set(symbol_to_word[i]), key=symbol_to_word[i].count)
+            labels[i] = w[:8]
+    nx.draw_networkx_labels(G, pos, labels=labels, font_size=8)
+    plt.title(f"1_graph_topology (Active: {len(symbol_to_word)})")
+    plt.savefig("1_graph_topology.png")
+    plt.close()
+
+    print("\n--- 📖 Narrative Report & Inference Scan ---")
+    hidden, prev_sym = None, None
+    start_token_id = data_tensor[0].view(1, 1)
+    x = start_token_id
+    gen_text = tokenizer.decode([x.item()])
+    
+    mod_history, stack_history, act_history = [], [], []
+    error_history, meta_history, trans_history = [], [], []
+    phase_reals, phase_imags = [], []
+
+    for step in range(50):
+        with torch.no_grad():
+            logits, hidden, curr_sym, act_pen, _, _, wins, _, avg_depth, error, _, meta_vals, _, trans_diff, _, _, _ = model(x, hidden, prev_sym)
+            
+            if step < 10 and prev_sym is not None:
+                story = narrator.explain_transition(prev_sym.item(), curr_sym.item())
+                print(f"[Step {step}] {story}")
+            
+            mod_history.append(wins.cpu().numpy())
+            stack_history.append(avg_depth.item())
+            act_history.append(1.0 + act_pen.item())
+            error_history.append(error.item())
+            meta_history.append(meta_vals.cpu().numpy())
+            trans_history.append(trans_diff.item())
+            
+            z = hidden[0].cpu().squeeze()
+            if z.dim() > 0: 
+                phase_reals.append(z.real[0].item())
+                phase_imags.append(z.imag[0].item())
+            else:
+                phase_reals.append(z.real.item())
+                phase_imags.append(z.imag.item())
+
+            probs = F.softmax(logits, dim=-1)
+            next_ix = torch.multinomial(probs, 1)
+            word = tokenizer.decode([next_ix.item()])
+            gen_text += word
+            prev_sym = curr_sym
+            x = next_ix
+
+    print(f"\nResulting Text Snippet: \"{gen_text}...\"")
+
+    # Plot 2-8
+    plt.figure(figsize=(12, 6))
+    mod_history = np.array(mod_history)
+    plt.plot(mod_history[:, 0], label='AttentionBlock', marker='o')
+    plt.plot(mod_history[:, 1], label='Stack', marker='s')
+    plt.plot(mod_history[:, 2], label='VQ', marker='^')
+    plt.plot(mod_history[:, 3], label='PersistentSensory', marker='x', linestyle='--')
+    plt.title("2_module_competition")
+    plt.legend()
+    plt.savefig("2_module_competition.png")
+    plt.close()
+
+    plt.figure(figsize=(12, 4))
+    plt.plot(stack_history, color='purple', label='Avg Stack Depth')
+    plt.fill_between(range(len(stack_history)), stack_history, color='purple', alpha=0.1)
+    plt.title("3_stack_depth")
+    plt.savefig("3_stack_depth.png")
+    plt.close()
+
+    plt.figure(figsize=(12, 4))
+    plt.bar(range(len(act_history)), act_history, color='orange')
+    plt.title("4_act_profile")
+    plt.savefig("4_act_profile.png")
+    plt.close()
+
+    plt.figure(figsize=(12, 4))
+    plt.plot(error_history, color='crimson', label='Prediction Error')
+    plt.fill_between(range(len(error_history)), error_history, color='crimson', alpha=0.1)
+    plt.title("5_error_signal")
+    plt.savefig("5_error_signal.png")
+    plt.close()
+
+    plt.figure(figsize=(8, 8))
+    plt.scatter(phase_reals, phase_imags, c=range(len(phase_reals)), cmap='plasma', alpha=0.5)
+    plt.colorbar(label="Time")
+    plt.title("6_phase_plot")
+    plt.axis('equal')
+    plt.savefig("6_phase_plot.png")
+    plt.close()
+    
+    plt.figure(figsize=(12, 6))
+    meta_history = np.array(meta_history)
+    plt.plot(meta_history[:, 0], label='Consistency')
+    plt.plot(meta_history[:, 1], label='Diversity')
+    plt.plot(meta_history[:, 2], label='Error')
+    plt.plot(meta_history[:, 3], label='Uncertainty')
+    plt.title("7_loss_weights")
+    plt.legend()
+    plt.savefig("7_loss_weights.png")
+    plt.close()
+    
+    plt.figure(figsize=(12, 4))
+    plt.plot(trans_history, color='gold', label='Transition Diff')
+    plt.fill_between(range(len(trans_history)), trans_history, color='gold', alpha=0.2)
+    plt.title("8_transition_magnitude")
+    plt.savefig("8_transition_magnitude.png")
+    plt.close()
+
+    extract_logic_rules(model, data_tensor)
+    generative_sampling(model)
+    ood_detection(model)
+
+# ==========================================
+# 9. Utility Analysis Functions
+# ==========================================
+# These functions are the diagnostic/interpretability layer.
+# They embody the NEUROLINGUISTIC pillar of the system:
+# extracting symbolic rules, generative graph walks, and
+# out-of-distribution anomaly detection from the trained model.
+
+def extract_logic_rules(model, data_tensor):
+    """
+    [ENGINEERING + NEUROLINGUISTIC]
+    Extracts emergent transition rules from the trained GVQ graph.
+    Maps (src_symbol -> dst_symbol) pairs to their frequency and
+    average ACT step cost, revealing the model's implicit grammar.
+
+    High-frequency, low-cost transitions = learned soft rules.
+    Low-frequency, high-cost transitions = rare/expensive cognitions.
+    """
+    print("\n--- Extracting Symbolic Transition Rules ---")
+    model.eval()
+    rule_book = defaultdict(list)
+    hidden, prev_sym = None, None
+
+    limit = min(1000, len(data_tensor) - 1)
+
+    with torch.no_grad():
+        for i in range(limit):
+            x = data_tensor[i].view(1, 1)
+            _, hidden, sym_idx, act_pen, _, _, _, _, _, _, _, _, _, _, _, _, _ = model(
+                x, hidden, prev_sym)
+            if prev_sym is not None:
+                src = prev_sym.item()
+                dst = sym_idx.item()
+                rule_book[(src, dst)].append(act_pen.item())
+            prev_sym = sym_idx
+
+    sorted_rules = sorted(rule_book.items(), key=lambda x: len(x[1]), reverse=True)
+    print(f"\n{'FROM':<8} | {'TO':<8} | {'COUNT':<7} | {'AVG ACT STEPS'}")
+    print("-" * 48)
+    for (src, dst), steps in sorted_rules[:15]:
+        if len(steps) > 1:
+            avg = sum(steps) / len(steps)
+            print(f"S_{src:<6} -> S_{dst:<6} | {len(steps):<7} | {avg:.3f}")
+
+
+def generative_sampling(model):
+    """
+    [NEUROLINGUISTIC + MATHEMATICAL]
+    Performs a probabilistic graph walk through the VQ adjacency matrix.
+    Rather than teacher-forcing from data, the model navigates its own
+    learned semantic graph, revealing the topology of its conceptual space.
+
+    Each step: sample next symbol from adjacency distribution -> decode token.
+    This is analogous to free association in psycholinguistics.
+    """
+    print("\n--- Generative Sampling (Semantic Graph Walk) ---")
+    adj = torch.sigmoid(model.vq_module.adjacency).detach().cpu().numpy()
+    model.eval()
+
+    start_token_id = data_tensor[0].view(1, 1)
+    x = start_token_id
+    with torch.no_grad():
+        _, hidden, prev_sym, _, _, _, _, _, _, _, _, _, _, _, _, _, _ = model(
+            x, None, None)
+
+    curr_sym = prev_sym.item()
+    output = tokenizer.decode([x.item()]) + " "
+
+    max_prob = np.max(adj)
+    dynamic_threshold = min(0.2, max_prob * 0.5) if max_prob > 0 else 0.0
+
+    for step in range(30):
+        probs = adj[curr_sym].copy()
+        probs[probs < dynamic_threshold] = 0.0
+        if probs.sum() < 1e-9:
+            print(f"  [Walk ended at step {step}: no valid transitions]")
+            break
+        probs = probs / probs.sum()
+        next_sym = np.random.choice(len(probs), p=probs)
+
+        z_flat = model.vq_module.codebook[next_sym].unsqueeze(0)
+        with torch.no_grad():
+            logits = model.decoder(z_flat)
+        word_idx = torch.argmax(logits).item()
+        output += tokenizer.decode([word_idx])
+        curr_sym = next_sym
+
+    print(f"  Graph Walk Output: \"{output}\"")
+
+
+def ood_detection(model):
+    """
+    [ENGINEERING + NEUROLINGUISTIC]
+    Out-of-Distribution (OOD) detection via graph consistency scoring.
+    Feeds semantically anomalous input through the trained model and
+    measures the graph topology consistency loss at each token position.
+
+    High consistency loss at a token = the model's learned graph has no
+    good transition to accommodate that concept: an epistemic surprise signal.
+
+    This operationalises the neurolinguistic concept of 'violation expectancy'
+    (cf. N400 ERP component in human language processing research).
+    """
+    print("\n--- OOD Detection (Violation Expectancy Analysis) ---")
+    corrupt_text = "The neural architecture of the mind is a banana"
+    input_indices = tokenizer.encode(corrupt_text)
+    input_tensor = input_indices.to(DEVICE)
+    tokens_decoded = [tokenizer.decode([t.item()]) for t in input_indices]
+
+    hidden, prev_sym = None, None
+    anomalies = []
+
+    with torch.no_grad():
+        for i in range(len(input_tensor) - 1):
+            x = input_tensor[i].view(1, 1)
+            _, hidden, prev_sym, _, _, cons_loss, _, _, _, _, _, _, _, _, _, _, _ = model(
+                x, hidden, prev_sym)
+            anomalies.append(cons_loss.item())
+
+    plt.figure(figsize=(12, 5))
+    plt.plot(range(len(anomalies)), anomalies, color='skyblue',
+             linestyle='-', linewidth=2, label='Graph Consistency Loss')
+    plt.scatter(range(len(anomalies)), anomalies, color='crimson',
+                s=60, zorder=5, label='Token Anomaly Score')
+    if len(tokens_decoded) > 1:
+        plt.xticks(range(len(anomalies)), tokens_decoded[1:], rotation=45, ha='right')
+    plt.ylabel("Consistency Loss (higher = more surprising)")
+    plt.title("9_ood_detection — Violation Expectancy (N400 Analogue)")
+    plt.legend()
+    plt.tight_layout()
+    plt.savefig("9_ood_detection.png")
+    plt.close()
+    print("  Saved: 9_ood_detection.png")
+
+    # Print token-level anomaly report
+    print(f"\n  {'TOKEN':<20} | ANOMALY SCORE")
+    print("  " + "-" * 36)
+    if len(tokens_decoded) > 1:
+        for tok, score in zip(tokens_decoded[1:], anomalies):
+            bar = "█" * min(20, int(score * 10))
+            print(f"  {repr(tok):<20} | {score:.4f}  {bar}")
+
+
+def run_belief_diagnostics(model):
+    """
+    [NEUROLINGUISTIC]
+    Prints a comprehensive belief-system snapshot:
+    confidence, support, reliability, proven streak, contradictions,
+    lexical grounding, and cognitive trajectory for the top-K beliefs.
+
+    Also runs paradigm shift analysis to detect when one belief has
+    been epistemically superseded by another.
+    """
+    print("\n=== BELIEF SYSTEM DIAGNOSTICS ===")
+    strongest = model.vq_module.strongest_beliefs(k=10)
+    narrator = NarrativeEngine(model.vq_module)
+
+    for rank, b in enumerate(strongest, 1):
+        snap = b.snapshot()
+        trajectory = narrator.explain_belief_change(b)
+        print(
+            f"  #{rank:>2}: S_{snap['symbol']:<4} '{snap['grounding']:<12}' | "
+            f"Conf={snap['confidence']:.3f} Supp={snap['support']:+.3f} "
+            f"Rel={snap['reliability']:.2f} Strk={snap['streak']:.1f} "
+            f"Ctrd={snap['contradictions']:<3} | {trajectory}"
+        )
+
+    print("\n  --- Paradigm Shift Analysis ---")
+    found_shift = False
+    for i in range(len(strongest)):
+        for j in range(len(strongest)):
+            if i == j:
+                continue
+            msg = narrator.explain_replacement(strongest[j].symbol_id,
+                                               strongest[i].symbol_id)
+            if msg:
+                print(f"  {msg}")
+                found_shift = True
+    if not found_shift:
+        print("  No paradigm shifts detected among top beliefs.")
+    print("=================================\n")
+
+
+if __name__ == "__main__":
+    FILENAME = "sacrsn_v41_0_unified.pth"
+    print("=" * 60)
+    print(" SACRSN v41.0 UNIFIED — STARTING TRAINING")
+    print("=" * 60)
+
+    trained_model = train()
+
+    print(f"\n--- Saving Model to {FILENAME} ---")
+    torch.save(trained_model.state_dict(), FILENAME)
+
+    print("\n--- Running Post-Training Analysis ---")
+    run_belief_diagnostics(trained_model)
+    visualize_all(trained_model)
